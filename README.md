@@ -1,7 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/npm/v/@newagebel/react-native-currency-field" />
   <img src="https://img.shields.io/badge/platform-Android%20%7C%20iOS-brightgreen" />
-  <img src="https://img.shields.io/github/license/NewAgeBel/react-native-currency-field" />
 </p>
 
 <h2 align="center">🤑 react-native-currency-field 🤑</h2>
