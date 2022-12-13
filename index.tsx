@@ -113,9 +113,9 @@ const CurrencyField = forwardRef<Handles, CurrencyFieldProps>(
         }}
         onChangeText={async (value: string) => {
           const computedValue = extractValue(value, {currency})
-          setLabel(label)
+          setLabel(value)
           setValue(computedValue)
-          onChangeText?.(computedValue, label)
+          onChangeText?.(computedValue, value)
         }}
         keyboardType="decimal-pad"
       />
