@@ -1,6 +1,5 @@
 package com.newagebel.RNCurrencyField
 
-import android.os.Build
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
@@ -17,25 +16,24 @@ import java.text.NumberFormat
 import java.util.*
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 fun ReadableMap.string(key: String): String? = this.getString(key)
 class RNCurrencyFieldModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     override fun getName() = "RNCurrencyField"
 
     @ReactMethod(isBlockingSynchronousMethod = true)
-    fun formatValue(value: Double, currency: String): String {
+    fun formatValue(value: Double, formatOptions: ReadableMap): String {
         return CurrencyMask.mask(
             value,
-            currency,
+            formatOptions,
             false,
             CurrencyMask.getNumberOfFractionDigits(DecimalFormat("0.##").format(value))
         )
     }
 
     @ReactMethod(isBlockingSynchronousMethod = true)
-    fun extractValue(label: String, currency: String): Double {
-        val (doubleValue, _ ,_) = CurrencyMask.unmask(label)
+    fun extractValue(value: String, formatOptions: ReadableMap): Double {
+        val (doubleValue, _ ,_) = CurrencyMask.unmask(value)
         return doubleValue
     }
 
@@ -150,22 +148,38 @@ open class CurrencyMask {
              return string.length
          }
 
-         fun getFormatter(currency: String): NumberFormat {
-             val format: NumberFormat = NumberFormat.getCurrencyInstance()
+         fun getFormatter(formatOptions: ReadableMap): NumberFormat {
+             val currency = formatOptions.getString("currency")
+             val minimumFractionDigits = if (formatOptions.hasKey("minimumFractionDigits")) {
+                 formatOptions.getInt("minimumFractionDigits")
+             } else { null }
+             val maximumFractionDigits = if (formatOptions.hasKey("maximumFractionDigits")) {
+                 formatOptions.getInt("maximumFractionDigits")
+             } else { null }
+             val signEnabled = if (formatOptions.hasKey("signEnabled")) {
+                 formatOptions.getBoolean("signEnabled")
+             } else { false }
+
+             val format = NumberFormat.getCurrencyInstance()
              format.currency = Currency.getInstance(currency)
-             format.maximumFractionDigits = 0
-             format.minimumFractionDigits = 0
-             return format
+             format.maximumFractionDigits = maximumFractionDigits ?: 0
+             format.minimumFractionDigits = minimumFractionDigits ?: 0
+
+            if (signEnabled == true && format is DecimalFormat) {
+                format.positivePrefix = "+" + format.positivePrefix
+            }
+
+            return format
          }
 
          fun getDecimalSeparator(): Char {
              return DecimalFormatSymbols.getInstance().decimalSeparator
          }
 
-         fun unmask(text: String): Triple<Double, Boolean, Int> {
+         fun unmask(value: String): Triple<Double, Boolean, Int> {
              val decimalSeparator = getDecimalSeparator()
 
-             val numbers = getNumbers(text)
+             val numbers = getNumbers(value)
 
              val numberOfFractionsDigits = getNumberOfFractionDigits(numbers)
 
@@ -182,15 +196,22 @@ open class CurrencyMask {
 
          fun mask(
             value: Double,
-            currency: String,
+            formatOptions: ReadableMap,
             isDecimalSeparatorLastSymbol: Boolean,
             numberOfFractionsDigits: Int
          ): String {
              val decimalSeparator = getDecimalSeparator()
-             val currencyFormatter = getFormatter(currency)
+             val currencyFormatter = getFormatter(formatOptions)
 
-             currencyFormatter.maximumFractionDigits = min(numberOfFractionsDigits, 2)
-             currencyFormatter.minimumFractionDigits = min(numberOfFractionsDigits, 2)
+             val minimumFractionDigits = if (formatOptions.hasKey("minimumFractionDigits")) {
+                 formatOptions.getInt("minimumFractionDigits")
+             } else { null }
+             val maximumFractionDigits = if (formatOptions.hasKey("maximumFractionDigits")) {
+                 formatOptions.getInt("maximumFractionDigits")
+             } else { null }
+
+             currencyFormatter.maximumFractionDigits = maximumFractionDigits ?: min(numberOfFractionsDigits, 2)
+             currencyFormatter.minimumFractionDigits = minimumFractionDigits ?: min(numberOfFractionsDigits, 2)
 
              val formattedCurrency = currencyFormatter.format(value)
 
@@ -226,9 +247,13 @@ open class CurrencyTextWatcher(
     private var afterText: String
     private var caretPosition: Int = 0
 
+    private val formatOptions = Arguments.createMap()
+
     private val field: WeakReference<EditText> = WeakReference(field)
 
     init {
+        formatOptions.putString("currency", currency)
+
         previousText = field.text.toString()
         afterText = field.text.toString()
         tidyCaretPosition()
@@ -279,7 +304,7 @@ open class CurrencyTextWatcher(
 
             val maskedValue = CurrencyMask.mask(
                 unmaskedValue,
-                currency,
+                formatOptions,
                 isDecimalSeparatorLastSymbol,
                 numberOfFractionsDigits
             )

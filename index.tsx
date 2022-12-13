@@ -29,10 +29,17 @@ To fix this issue try these steps:
 `)
 }
 
+interface FormatOptions {
+  currency: string,
+  minimumFractionDigits?: number,
+  maximumFractionDigits?: number,
+  signEnabled?: boolean
+}
+
 type NativeExports = {
   initializeCurrencyField: (reactNode: Number, options: any) => void
-  formatValue: (value: number, currency: string) => string
-  extractValue: (label: string, currency: string) => number
+  formatValue: (value: number, formatOptions: FormatOptions) => string
+  extractValue: (value: string, formatOptions: FormatOptions) => number
 }
 
 type CurrencyFieldProps = Pick<TextInputProps, Exclude<keyof TextInputProps, "value" | "onChangeText">> & {
@@ -59,7 +66,7 @@ const CurrencyField = forwardRef<Handles, CurrencyFieldProps>(
      ...rest
    }, ref) => {
     // Create a default input
-    const [ defaultLabel ] = useState(formatValue(value ?? 0, currency))
+    const [ defaultLabel ] = useState(formatValue(value ?? 0, {currency}))
 
     // Keep a reference to the actual text input
     const input = useRef<TextInput>(null)
@@ -70,9 +77,9 @@ const CurrencyField = forwardRef<Handles, CurrencyFieldProps>(
     useEffect(() => {
         if (value != null && value != rawValue) {
             setValue(value)
-            setLabel(formatValue(value, currency));
+            setLabel(formatValue(value, {currency}));
         }
-    }, [value, rawValue])
+    }, [value, rawValue, currency])
 
     // Convert TextInput to CurrencyField native type
     useEffect(() => {
@@ -100,12 +107,12 @@ const CurrencyField = forwardRef<Handles, CurrencyFieldProps>(
         onFocus={(e: any) => {
           if (defaultLabel == "" && !rawValue) {
             setValue(0)
-            setLabel(formatValue(0, currency));
+            setLabel(formatValue(0, {currency}));
           }
           onFocus?.(e)
         }}
-        onChangeText={async (label: string) => {
-          const computedValue = extractValue(label, currency)
+        onChangeText={async (value: string) => {
+          const computedValue = extractValue(value, {currency})
           setLabel(label)
           setValue(computedValue)
           onChangeText?.(computedValue, label)

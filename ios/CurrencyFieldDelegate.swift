@@ -34,7 +34,7 @@ open class CurrencyFieldDelegate: NSObject, UITextFieldDelegate {
 
     open weak var listener: CurrencyFieldListener?
     open var onChangeListener: ((_ textField: UITextField, _ value: String) -> ())?
-    open var currency: String
+    open var formatOptions: NSDictionary
     open var maxValue: Double
     open var selectTextOnInit: Bool
 
@@ -46,13 +46,13 @@ open class CurrencyFieldDelegate: NSObject, UITextFieldDelegate {
         onMaskedTextChangedCallback: ((_ textInput: UITextInput, _ value: String) -> ())? = nil
        ) {
            self.onChangeListener = onMaskedTextChangedCallback
-           self.currency = currency
+           self.formatOptions = ["currency": currency]
            self.maxValue = maxValue
            self.selectTextOnInit = selectTextOnInit
 
            textView.caretPosition = CurrencyMask.getIndexOfCaretPosition(
                string: textView.text ?? "",
-               currency: self.currency
+               formatOptions: self.formatOptions
            )
 
            if (selectTextOnInit == true) {
@@ -72,7 +72,7 @@ open class CurrencyFieldDelegate: NSObject, UITextFieldDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now()) {
             textField.caretPosition = CurrencyMask.getIndexOfCaretPosition(
                 string: textField.text ?? "",
-                currency: self.currency
+                formatOptions: self.formatOptions
             )
         }
         listener?.textFieldDidBeginEditing?(textField)
@@ -108,8 +108,8 @@ open class CurrencyFieldDelegate: NSObject, UITextFieldDelegate {
             isDecimalSeparatorLastSymbol,
             numberOfFractionsDigits
         ) = CurrencyMask.unmask(
-            input: updatedText,
-            currency: self.currency
+            value: updatedText,
+            formatOptions: self.formatOptions
         )
 
         if !shouldAllowChange(symbol: string, newValue: unmaskedValue, oldValue: originalString) {
@@ -118,7 +118,7 @@ open class CurrencyFieldDelegate: NSObject, UITextFieldDelegate {
 
         let maskedValue = CurrencyMask.mask(
             value: unmaskedValue,
-            currency: self.currency,
+            formatOptions: self.formatOptions,
             isDecimalSeparatorLastSymbol: isDecimalSeparatorLastSymbol,
             numberOfFractionsDigits: numberOfFractionsDigits
         )
@@ -127,7 +127,7 @@ open class CurrencyFieldDelegate: NSObject, UITextFieldDelegate {
 
         textField.caretPosition = CurrencyMask.getIndexOfCaretPosition(
             string: maskedValue,
-            currency: self.currency
+            formatOptions: self.formatOptions
         )
 
         // Update JS land
@@ -140,7 +140,7 @@ open class CurrencyFieldDelegate: NSObject, UITextFieldDelegate {
     }
 
     open func shouldAllowChange(symbol: String, newValue: Double, oldValue: String) -> Bool {
-        let decimalSeparator = CurrencyMask.getDecimalSeparator(currency: currency)
+        let decimalSeparator = CurrencyMask.getDecimalSeparator(formatOptions: self.formatOptions)
 
         if oldValue.contains(decimalSeparator) && symbol == decimalSeparator  {
             return false
@@ -170,9 +170,9 @@ open class CurrencyFieldDelegate: NSObject, UITextFieldDelegate {
 class CurrencyMask {
     static func getNumberOfFractionDigits(
         string: String,
-        currency: String
+        formatOptions: NSDictionary
     ) -> Int {
-        let decimalSeparator = getDecimalSeparator(currency: currency)
+        let decimalSeparator = getDecimalSeparator(formatOptions: formatOptions)
 
         let arr = string.components(separatedBy: decimalSeparator)
 
@@ -184,9 +184,9 @@ class CurrencyMask {
 
     static func getNumbers(
         string: String,
-        currency: String
+        formatOptions: NSDictionary
     ) -> String {
-        let decimalSeparator = getDecimalSeparator(currency: currency)
+        let decimalSeparator = getDecimalSeparator(formatOptions: formatOptions)
         return string.components(separatedBy: CharacterSet(charactersIn: "0123456789\(decimalSeparator)").inverted).joined()
     }
 
@@ -196,19 +196,19 @@ class CurrencyMask {
 
     static func getIndexOfDecimalSeparator(
         string: String,
-        currency: String
+        formatOptions: NSDictionary
     ) -> Int {
-        let decimalSeparator = getDecimalSeparator(currency: currency)
+        let decimalSeparator = getDecimalSeparator(formatOptions: formatOptions)
         return Array(string).lastIndex(where: {$0.description == decimalSeparator}) ?? -1
     }
 
     static func getIndexOfCaretPosition(
         string: String,
-        currency: String
+        formatOptions: NSDictionary
     ) -> Int {
         let indexOfDecimalSeparator = getIndexOfDecimalSeparator(
             string: string,
-            currency: currency
+            formatOptions: formatOptions
         )
         let indexOfLastNumber = getIndexOfLastNumber(string: string)
 
@@ -218,36 +218,48 @@ class CurrencyMask {
         return 1
     }
 
-    static func getFormatter(currency: String) -> NumberFormatter {
+    static func getFormatter(formatOptions: NSDictionary) -> NumberFormatter {
+        let currency = formatOptions["currency"] as! String
+        let minimumFractionDigits = formatOptions["minimumFractionDigits"] as! Int?
+        let maximumFractionDigits = formatOptions["maximumFractionDigits"] as! Int?
+        let signEnabled = formatOptions["signEnabled"] as! Bool?
+
         let currencyFormatter = NumberFormatter()
         currencyFormatter.numberStyle = .currency
         currencyFormatter.currencyCode = currency
-        currencyFormatter.maximumFractionDigits = 0
-        currencyFormatter.minimumFractionDigits = 0
+        currencyFormatter.maximumFractionDigits = maximumFractionDigits != nil ? maximumFractionDigits! : 0
+        currencyFormatter.minimumFractionDigits = minimumFractionDigits != nil ? minimumFractionDigits! : 0
         currencyFormatter.currencyDecimalSeparator = currencyFormatter.decimalSeparator
         currencyFormatter.currencyGroupingSeparator = currencyFormatter.groupingSeparator
+
+        if (signEnabled != nil && signEnabled!) {
+            currencyFormatter.positivePrefix = currencyFormatter.negativePrefix.replacingOccurrences(
+                of: currencyFormatter.minusSign,
+                with: currencyFormatter.plusSign
+            )
+        }
         return currencyFormatter
     }
 
-    static func getDecimalSeparator(currency: String) -> String {
-        let currencyFormatter = getFormatter(currency: currency)
+    static func getDecimalSeparator(formatOptions: NSDictionary) -> String {
+        let currencyFormatter = getFormatter(formatOptions: formatOptions)
         return currencyFormatter.currencyDecimalSeparator
     }
 
     static func unmask(
-        input: String,
-        currency: String
+        value: String,
+        formatOptions: NSDictionary
     ) -> (Double, Bool, Int) {
-        let currencyFormatter = getFormatter(currency: currency)
+        let currencyFormatter = getFormatter(formatOptions: formatOptions)
 
         let numbers = getNumbers(
-            string: input,
-            currency: currency
+            string: value,
+            formatOptions: formatOptions
         )
 
         let numberOfFractionsDigits = getNumberOfFractionDigits(
             string: numbers,
-            currency: currency
+            formatOptions: formatOptions
         )
 
         let isDecimalSeparatorLastSymbol = numbers.last?.description == currencyFormatter.decimalSeparator
@@ -264,14 +276,17 @@ class CurrencyMask {
 
     static func mask(
         value: Double,
-        currency: String,
+        formatOptions: NSDictionary,
         isDecimalSeparatorLastSymbol: Bool,
         numberOfFractionsDigits: Int
     ) -> String  {
-        let currencyFormatter = getFormatter(currency: currency)
+        let currencyFormatter = getFormatter(formatOptions: formatOptions)
 
-        currencyFormatter.maximumFractionDigits = min(numberOfFractionsDigits, 2)
-        currencyFormatter.minimumFractionDigits = min(numberOfFractionsDigits, 2)
+        let minimumFractionDigits = formatOptions["minimumFractionDigits"] as! Int?
+        let maximumFractionDigits = formatOptions["maximumFractionDigits"] as! Int?
+
+        currencyFormatter.maximumFractionDigits = maximumFractionDigits != nil ? maximumFractionDigits! : max(numberOfFractionsDigits, 2)
+        currencyFormatter.minimumFractionDigits = minimumFractionDigits != nil ? minimumFractionDigits! : min(numberOfFractionsDigits, 2)
 
         let formattedCurrency = currencyFormatter.string(from: NSNumber(value: value))
 

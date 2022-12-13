@@ -17,26 +17,28 @@ class TextInputMask: NSObject, RCTBridgeModule, CurrencyFieldListener {
     var bridge: RCTBridge!
     var masks: [String: CurrencyFieldDelegate] = [:]
     var listeners: [String: CurrencyFieldListener] = [:]
-
-    @objc(formatValue:currency:)
-    func formatValue(value: NSNumber, currency: NSString) -> String {
+    
+    @objc(formatValue:formatOptions:)
+    func formatValue(value: NSNumber, formatOptions: NSDictionary) -> String {
+        let currency = formatOptions["currency"] as! String
+                
         return CurrencyMask.mask(
             value: value.doubleValue,
-            currency: String(currency),
+            formatOptions: formatOptions,
             isDecimalSeparatorLastSymbol: false,
             numberOfFractionsDigits:
                 CurrencyMask.getNumberOfFractionDigits(
                     string: value.description,
-                    currency: String(currency)
+                    formatOptions: formatOptions
                 )
         )
     }
 
-    @objc(extractValue:currency:)
-    func extractValue(value: NSString, currency: NSString) -> NSNumber {
+    @objc(extractValue:formatOptions:)
+    func extractValue(value: NSString, formatOptions: NSDictionary) -> NSNumber {
         let (doubleValue, _, _) = CurrencyMask.unmask(
-            input: String(value),
-            currency: String(currency)
+            value: String(value),
+            formatOptions: formatOptions
         )
         return NSNumber(value: doubleValue)
     }

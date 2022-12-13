@@ -4,9 +4,9 @@
 
 
 RCT_EXTERN__BLOCKING_SYNCHRONOUS_METHOD(formatValue:(nonnull NSNumber) value
-                                        currency: (nonnull NSString) currency)
+                                        formatOptions: (nonnull NSDictionary) formatOptions)
 RCT_EXTERN__BLOCKING_SYNCHRONOUS_METHOD(extractValue:(nonnull NSString) value
-                                        currency: (nonnull NSString) currency)
+                                        formatOptions: (nonnull NSDictionary) formatOptions)
 
 RCT_EXTERN_METHOD(initializeCurrencyField:(nonnull NSNumber *)reactNode
                   options:(NSDictionary *)option)
