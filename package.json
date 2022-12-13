@@ -1,6 +1,6 @@
 {
   "name": "@newagebel/react-native-currency-field",
-  "version": "1.0.0",
+  "version": "1.1.0-0",
   "description": "A fully native TextInput component that supports all currencies and locales.",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
